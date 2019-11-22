@@ -1,14 +1,20 @@
-# AesOracle Package
+# AesOracle - AES Encryption without a Key
 
-An example implementation of a Padding Oracle algorithm for both
+This is an example implementation of a Padding Oracle algorithm for both
 decrypting and encrypting data.
+
+Disclaimer:  This module was written for educational purposes to accompany
+my LinkedIn article "AES Encrypt without a Key?".  Please do not attempt
+to use this code or information on or against any system for 
+which you do not have explicit authorization from the owner.
+I shall not be held responsible for your actions.
 
 ## Prerequisites
 
 ### AesOracle
 
 Python 3 is about all you need to use the encryption and decryption oracle
-engine.  You will need a vulnerable server which in included in the
+engine.  You will need a vulnerable server which is included in this
 repository.
 
 ### AesOracleServer
@@ -37,4 +43,11 @@ Or run:  python ExploitOracle.py
 Read the source code for ExploitOracle.py.  You will need a vulnerable server
 and some sort of query or post that you can do to reveal padding errors, and
 your client will need to implement and supply the PaddingOracle function.
+
+The test server puts out a lot of info so you can watch progress.  Each request represents an IV+CT block pair where the server is helping us decrypt the CT
+based on its oracle.
+
+# Hack Ethically
+
+'nough said.
 
