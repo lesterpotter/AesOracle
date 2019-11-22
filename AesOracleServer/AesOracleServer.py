@@ -49,4 +49,5 @@ def index():
     IV = m.digest()[ :16]
     res = toWeb64(IV + AES.new(b'SuperSecretSauce', AES.MODE_CBC, IV).encrypt(pkcs_pad(b'{ "example" : "json" }')))
     return template('<b>Example: {{res}}</b>', res=res)
+
 run(host='localhost', port=8080)

