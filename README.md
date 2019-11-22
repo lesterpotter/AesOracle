@@ -4,7 +4,7 @@ This is an example implementation of a Padding Oracle algorithm for both
 decrypting and encrypting data.
 
 Disclaimer:  This module was written for educational purposes to accompany
-my LinkedIn article "AES Encrypt without a Key?".  Please do not attempt
+my LinkedIn article "[AES Encrypt Without a Key?](https://www.linkedin.com/pulse/aes-encryption-without-key-les-potter)".  Please do not attempt
 to use this code or information on or against any system for 
 which you do not have explicit authorization from the owner.
 I shall not be held responsible for your actions.
