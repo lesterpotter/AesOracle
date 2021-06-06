@@ -152,6 +152,7 @@ class PaddingOracleCracker():
         # This internal decryptor expects a single self.m_blocksize string
         # to work on.
         
+        XVP = self.f_genIVPrime()     # make up another random iv, needed for oracle to work consistently
         IVP = self.f_genIVPrime()      # make up a random prior block
         PI = [0] * self.m_blockSize   # initialize an empty interim block
 
@@ -176,10 +177,13 @@ class PaddingOracleCracker():
             for i in range(256):
                 IVP[offt] = bytes([i])  # trial and error on the unknown position
 
-                newcipherdata = b''.join(IVP)          # add our test IV
+                newcipherdata = b''
+                if j == 16: newcipherdata += b''.join(XVP)  # Only need to do this on j == 16
+                newcipherdata += b''.join(IVP)          # add our test IV
                 newcipherdata += CT       # add encrypted text
 
                 # let the oracle decide
+                print(j, i)
                 if self.m_oracle(newcipherdata):
                     #test for a special case when j==1
                     if j == 1:
@@ -206,7 +210,7 @@ class PaddingOracleCracker():
                     found = True
                     break
             if not found:
-                raise PaddingOracleException("oracle failed")
+                raise PaddingOracleCracker.PaddingOracleException("oracle failed")
             j += 1
             
         PIs = b''.join([bytes([c]) for c in PI])
